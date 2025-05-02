@@ -3,15 +3,18 @@ import logging
 import json
 import wikipedia as wiki
 from openai import OpenAI 
-from dotenv import load_dotenv
 from .status_manager.store_class import TaskStatuses
+from os.path import join, dirname
+from dotenv import load_dotenv
 
+
+dotenv_path = join(dirname(__file__), ".env")
+load_dotenv(dotenv_path)
+
+OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
-
-load_dotenv()
-OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')
 
 
 def parse_data(topic: str, document_id: str, task_id: str, task_statuses: TaskStatuses):
@@ -90,7 +93,10 @@ def get_chat_response(session_id: str, document_id: str, inputs: str) -> str:
         logger.warning(f"File not found: {doc_path}")
         return "Error: The requested document does not exist. Please provide a valid document_id."
 
-    client = OpenAI(api_key=OPENAI_API_KEY)
+    client = OpenAI(
+        base_url="https://openrouter.ai/api/v1",
+        api_key=OPENAI_API_KEY,
+        )
     chat_id = len(session_history.get("session_history", [])) + 1
     doc_content = read_text_from_file(doc_path)
 

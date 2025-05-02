@@ -1,3 +1,4 @@
+import nanoid
 from fastapi import FastAPI, BackgroundTasks, Depends
 from pydantic import BaseModel, Field, field_validator
 
@@ -11,45 +12,36 @@ app = FastAPI()
 
 class ProcessInputs(BaseModel):
     topic: str
-    document_id: str = Field(..., max_length=50)
-
-
-    @field_validator("document_id")
-    def check_non_empty(cls, v):
-        if not v.strip():
-            raise ValueError("Field cannot be empty")
-        return v
 
 
 class ChatInputs(BaseModel):
-    session_id: str = Field(..., max_length=50)
     document_id: str = Field(..., max_length=50)
     text: str
 
-
-    @field_validator("session_id", "document_id", "text")
+    @field_validator("document_id", "text")
     def check_non_empty(cls, v):
         if not v.strip():
             raise ValueError("Field cannot be empty")
         return v
 
 
-@app.post("/api/v1/process")
+@app.post("/api/process")
 async def process(inputs: ProcessInputs, background_tasks: BackgroundTasks, task_statuses: TaskStatuses = Depends(task_statuses_instance)):
     """
     Accept textual requests and launch a background task to gather textual information from Wikipedia.
 
     :return: task_id of the background task that was started
     """
-    task_id = f"{inputs.document_id}_task"
+    document_id = f"{nanoid.generate(size=5)}_doc" 
+    task_id = f"{document_id}_task"
     task_statuses.set_status_pending(task_id)
 
-    background_tasks.add_task(parse_data, inputs.topic, inputs.document_id, task_id, task_statuses)
+    background_tasks.add_task(parse_data, inputs.topic, document_id, task_id, task_statuses)
 
     return {"task_id": task_id}
 
 
-@app.get("/api/v1/status/{task_id}")
+@app.get("/api/status/{task_id}")
 def status(task_id: str, task_statuses: TaskStatuses = Depends(task_statuses_instance)):
     """
     Check the status of the background task. It should receive a task_id path parameter and return the status of the task.
@@ -63,7 +55,7 @@ def status(task_id: str, task_statuses: TaskStatuses = Depends(task_statuses_ins
     return {"status": status}
 
 
-@app.post("/api/v1/chat")
+@app.post("/api/chat")
 def chat(inputs: ChatInputs):
     """
     Endpoint for interaction with СhatGPT. The document with `document_id` identifier should be inserted
@@ -76,11 +68,12 @@ def chat(inputs: ChatInputs):
 
     :return: bot response
     """
-    response = get_chat_response(inputs.session_id, inputs.document_id, inputs.text)
+    session_id = f"{inputs.document_id}_session"
+    response = get_chat_response(session_id, inputs.document_id, inputs.text)
 
     return {"response": response}
 
 
-@app.get("/-/healthy/")
+@app.get("/healthy/")
 def healthy():
     return {}
